@@ -1,0 +1,5 @@
+# ninja log v6
+3	1150	7645562036137444	CMakeFiles/Lab07.dir/main.cpp.obj	3bad1bd24ac3ef14
+2	208	7645573995278493	build.ninja	1fee85a95f21469c
+4	1125	7645574046416043	CMakeFiles/Lab07.dir/robot.cpp.obj	8b25fc03af8ab155
+1127	1219	7645574057646143	Lab07.exe	b7a34cd18446cbc0
