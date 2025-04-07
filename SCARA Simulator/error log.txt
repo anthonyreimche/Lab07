@@ -1,9 +1,3 @@
 Error: Unknown Command!
-Command was: PROCESS_MESSAGE OFF
-
-Error: Unknown Command!
-Command was: PROCESS_MESSAGE OFF
-
-Error: Unknown Command!
-Command was: PROCESS_MESSAGE OFF
+Command was: PEN_DOWNROTATE_JOINT ANG1 50.00 ANG2 60.00
 

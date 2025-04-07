@@ -48,12 +48,6 @@
 #include <math.h>   // <list of functions used>
 #include "robot.h"  // <list of functions used> // NOTE: DO NOT REMOVE.
 
-/*|Globals|--------------------------------------------------------------------*/
-CRobot robot;     // the global robot Class instance.  Can be used everywhere
-                  // robot.Initialize()
-                  // robot.Send()
-                  // robot.Close()
-
 /*|CONSTANTS|------------------------------------------------------------------*/
 #define L1                    350.0
 #define L2                    250.0
@@ -63,73 +57,217 @@ CRobot robot;     // the global robot Class instance.  Can be used everywhere
 #define PI                    3.14159265358979323846
 #define LEFT_ARM_SOLUTION     0
 #define RIGHT_ARM_SOLUTION    1
+#define ESC                   27
+
+/*|Globals|--------------------------------------------------------------------*/
+CRobot robot;
+bool ArmType = LEFT_ARM_SOLUTION;
+char commandString[MAX_STRING];
 
 /*|Function Prototypes|--------------------------------------------------------*/
-//double DegToRad(double);  // returns angle in radians from input angle in degrees
-//double RadToDeg(double);  // returns angle in degrees from input angle in radians
-
+int scaraFK (double, double, double*, double*);
+int scaraIK (double, double, double*, double*, int);
+void moveScaraIK(void);
+void moveScaraFK(void);
 
 int main(){
-   // Variables
-   char commandString[MAX_STRING];   // string for simulator commands
-   double thetaDeg1,thetaDeg2;
 
    // Open a connection with the simulator
    if(!robot.Initialize()) return 0;
-   
-   // here are examples of how to send the robot commands. must use robot.
-   robot.Send("CYCLE_PEN_COLORS OFF\n");  // DON'T FORGET \n AT THE END OF _EVERY_ COMMAND
-   robot.Send("PEN_COLOR 0 0 255\n");
-   robot.Send("ROTATE_JOINT ANG1 150.00 ANG2 90.00\n"); // here is an explicit way to move the robot when you know absolute values of angles
-   robot.Send("PEN_COLOR 255 0 0\n");
-   
-   // And here is how you will move the robot more generally by calculating thetaDeg1 and thetaDeg2 variables. 
-   // Note those are your variable names ...   scaraIK would be called first to calculate thetaDeg1 and thetaDeg2
-   thetaDeg1=-45.0; // define some angles. Arbitrary.  
-   thetaDeg2=-155.0;
-   sprintf(commandString, "ROTATE_JOINT ANG1 %.2lf ANG2 %.2lf\n", thetaDeg1, thetaDeg2);
-   robot.Send(commandString);
 
-   robot.Send("PEN_UP\n");
-   robot.Send("ROTATE_JOINT ANG1 150.00 ANG2 90.00\n\n");
-   robot.Send("PEN_DOWN\n");
-   robot.Send(commandString);
-   robot.Send("PEN_COLOR 10 64 109\n");
-   robot.Send("ROTATE_JOINT ANG1 -150.00 ANG2 90.00\n");
-   robot.Send("PROCESS_MESSAGE OFF\n");
-   robot.Send("MESSAGE Erasing Traces\n");
-   robot.Send("CLEAR_TRACE\n");
-
-   robot.Send("HOME\n");
-
-   printf("\n\nWhat do the following commands do?\n");
-   getchar();
-
-   robot.Send("CLEAR_REMOTE_COMMAND_LOG\n");
-   robot.Send("CLEAR_POSITION_LOG\n");
-   robot.Send("MESSAGE Bye-Bye\n");
-   robot.Send("SHUTDOWN_SIMULATION\n");
-   robot.Send("END\n");
-
+   while (1) {
+      //moveScaraFK();
+      moveScaraIK();
+   }
    printf("\n\nPress ENTER to end the program...\n");
    getchar();
-
-   
    robot.Close(); // close remote connection
    return 0;
 }
 
+/**
+ * @brief This function will calculate the x,y coordinates given two joint angles.
+ *
+ * @param _j1 Angle of joint 1 in degrees.
+ * @param _j2 Angle of joint 2 in degrees.
+ * @param _x The tool position along the x-axis. Pointer
+ * @param _y The tool position along the y-axis. Pointer
+ *
+ * @return inRange (0) in range, (-1) out of range
+ */
+int scaraFK (double _j1, double _j2, double* _x, double* _y) {
+   if (abs(_j1) > MAX_ABS_THETA1_DEG) return -1;
+   if (abs(_j2) > MAX_ABS_THETA2_DEG) return -2;
 
-//---------------------------------------------------------------------------------------
-// Returns angle in radians from input angle in degrees.  Robot only accepts degrees!!
-//double DegToRad(double angDeg)
-//{
-   //write code here.  One line only
-//}
+   _j1 *= PI/180.0;
+   _j2 *= PI/180.0;
+   *_x = L1*cos(_j1)+L2*cos(_j1+_j2);
+   *_y = L1*sin(_j1)+L2*sin(_j1+_j2);
 
-//---------------------------------------------------------------------------------------
-// Returns angle in radians from input angle in degrees
-//double RadToDeg(double angRad)
-//{
-  //write code here.  One line only
-//}
+   return 0;
+}
+
+void promptPen() {
+   char pen;
+   printf("Draw line? (Y/N):\n");
+   scanf("%c", &pen);
+   getchar();
+   robot.Send(pen=='y' || pen == 'Y' ? "PEN_DOWN\n" : "PEN_UP\n");
+}
+
+/**
+* @brief Calculate two joint angles given the x,y coordinates.
+*
+* @param _x - The tool position along the x-axis.
+* @param _y - The tool position along the y-axis.
+* @param _j1 - Angle of joint 1 in degrees. Pointer
+* @param _j2 - Angle of joint 2 in degrees. Pointer
+* @param arm - Selects which solution to try.
+*
+* @return - (0) in range, (-1) out of range
+*/
+int scaraIK (double _x, double _y, double* _j1, double* _j2, int arm) {
+
+   const double L = sqrt(_x*_x + _y*_y);
+   const double Min = sqrt(((L1*L1) + (L2*L2)) - (2 * L1 * L2 * cos(0.174532925)));
+
+   if ( L > L1 + L2 ) return -1;
+   if ( L < Min ) return -2;
+
+   // Calculate joint angles
+   const double beta = atan2(_y,_x);
+   const double alpha = acos(((L2*L2) - (L*L) - (L1*L1)) / (-2*L*L1));
+
+   // Use a sign multiplier based on arm configuration
+   double sign = (arm == LEFT_ARM_SOLUTION) ? -1.0 : 1.0;
+   *_j1 = beta + (sign * alpha);
+
+   //*_j1 = beta + (arm ? alpha : -alpha);
+   *_j2 = atan2(_y - (L1 * sin(*_j1)), _x - (L1 * cos(*_j1))) - *_j1;
+   
+   // Convert to degrees
+   *_j1 *= 180/PI;
+   *_j2 *= 180/PI;
+
+   if (*_j2 < -MAX_ABS_THETA2_DEG) *_j2 += 360;
+   if (*_j2 > MAX_ABS_THETA2_DEG) *_j2 -= 360;
+   if (*_j1 < -MAX_ABS_THETA1_DEG) *_j1 += 360;
+   if (*_j1 > MAX_ABS_THETA1_DEG) *_j1 -= 360;
+
+   if (fabs(*_j1) > MAX_ABS_THETA1_DEG) return -1;
+   if (fabs(*_j2) > MAX_ABS_THETA2_DEG) return -1;
+
+   return 0;
+}
+
+/**
+ *@brief function will ask the user for SCARA joint variables in degrees. Then ask the user for the pen position and display the X,Y position.
+*
+* @param void
+*
+* @return void
+*/
+
+void moveScaraFK(void) {
+   char pose;
+   double J1, J2, X, Y;
+   int error;
+   //Prompt for angles
+   do {
+      error = 0;
+      printf("\n\nInput 2 angles in degrees (J1, J2):\n");
+      scanf("%lf, %lf", &J1, &J2);
+      printf("%lf,%lf\n",J1,J2);
+      getchar();
+
+      error = scaraFK(J1,J2,&X,&Y);
+      switch (error) {
+         case (-1):
+            printf("J1 is out of bounds!\n");
+            printf("Range for J1: ±%.2lf°\n",MAX_ABS_THETA1_DEG);
+            continue;
+         break;
+         case (-2):
+            printf("J2 is out of bounds!\n");
+            printf("Range for J2: ±%.2lf°\n",MAX_ABS_THETA2_DEG);
+            continue;
+         break;
+      }
+   } while (error);
+
+   promptPen();
+
+   printf("Calculated coordinates: %.2lf,%.2lf\n",X,Y);
+   sprintf(&commandString[0], "ROTATE_JOINT ANG1 %.2lf ANG2 %.2lf\n", J1, J2);
+   robot.Send(commandString);
+   robot.Send("PEN_UP\n");
+}
+
+/**
+* @brief This function will ask the user for SCARA joint variables in degrees. Then ask the user for the pen position and display the X,Y position.
+* @param void
+* @return void
+ */
+void moveScaraIK(void) {
+   char pose;
+   double J1, J2, X, Y;
+   int error;
+   int RL = 0;
+   //Prompt for angles
+   do {
+      error = 0;
+      printf("\n\nInput a set of coordinates (X, Y):\n");
+      scanf("%lf, %lf", &X, &Y);
+      getchar();
+
+      error = scaraIK(X,Y,&J1,&J2, ArmType);
+      if (error) {
+         error = scaraIK(X,Y,&J1,&J2, -ArmType);
+         /*RL = 1;
+         if (!scaraIK(X,Y,&J1,&J2, -ArmType)) {
+            ArmType = -ArmType;
+            RL = 2;
+            error = -1;
+         }*/
+      }
+
+      switch (error) {
+         case (-1):
+            printf("coordinates exceed maximum range!\n");
+            printf("Max range: %.2lf mm\nMin range: %.2lf mm",L1+L2,L1-L2);
+         continue;
+         break;
+         case (-2):
+            printf("coordinates exceed minimum range!\n");
+            printf("Max range: %.2lf mm\nMin range: %.2lf mm",L1+L2,L1-L2);
+         continue;
+         break;
+      }
+
+      //Prompt for pose type
+      bool _pose;
+      if (RL ==0) {
+         do {
+            _pose = false;
+            printf("Select arm pose (L/R): ");
+            scanf_s("%c",&pose,1);
+            getchar();
+            if (pose == 'R' || pose == 'r') {
+               ArmType = RIGHT_ARM_SOLUTION;
+               scaraIK(X,Y,&J1,&J2, ArmType);
+               _pose = true;
+            }
+            if (pose == 'L' || pose == 'l') {
+               ArmType = LEFT_ARM_SOLUTION;
+               scaraIK(X,Y,&J1,&J2, ArmType);
+               _pose = true;
+            }
+         } while (!_pose);
+      }
+   } while (error);
+   promptPen();
+   printf("Calculated angles: %.2lf,%.2lf\n",J1,J2);
+   sprintf(&commandString[0], "ROTATE_JOINT ANG1 %.2lf ANG2 %.2lf\n", J1, J2);
+   robot.Send(commandString);
+   robot.Send("PEN_UP\n");
+}
