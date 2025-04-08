@@ -1,0 +1,3 @@
+C:/Users/roota/CLionProjects/Lab07/build/CMakeFiles/Lab07.dir
+C:/Users/roota/CLionProjects/Lab07/build/CMakeFiles/edit_cache.dir
+C:/Users/roota/CLionProjects/Lab07/build/CMakeFiles/rebuild_cache.dir

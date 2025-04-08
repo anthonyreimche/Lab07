@@ -1,0 +1,3 @@
+C:/Users/roota/CLionProjects/Lab07/windsurf_build/CMakeFiles/Lab07.dir
+C:/Users/roota/CLionProjects/Lab07/windsurf_build/CMakeFiles/edit_cache.dir
+C:/Users/roota/CLionProjects/Lab07/windsurf_build/CMakeFiles/rebuild_cache.dir

@@ -138,11 +138,7 @@ int scaraIK (double _x, double _y, double* _j1, double* _j2, int arm) {
    const double beta = atan2(_y,_x);
    const double alpha = acos(((L2*L2) - (L*L) - (L1*L1)) / (-2*L*L1));
 
-   // Use a sign multiplier based on arm configuration
-   double sign = (arm == LEFT_ARM_SOLUTION) ? -1.0 : 1.0;
-   *_j1 = beta + (sign * alpha);
-
-   //*_j1 = beta + (arm ? alpha : -alpha);
+   *_j1 = beta + (arm  == RIGHT_ARM_SOLUTION ? alpha : -alpha);
    *_j2 = atan2(_y - (L1 * sin(*_j1)), _x - (L1 * cos(*_j1))) - *_j1;
    
    // Convert to degrees
@@ -184,12 +180,12 @@ void moveScaraFK(void) {
       switch (error) {
          case (-1):
             printf("J1 is out of bounds!\n");
-            printf("Range for J1: ±%.2lf°\n",MAX_ABS_THETA1_DEG);
+            printf("Range for J1: ±%.2lf deg\n",MAX_ABS_THETA1_DEG);
             continue;
          break;
          case (-2):
             printf("J2 is out of bounds!\n");
-            printf("Range for J2: ±%.2lf°\n",MAX_ABS_THETA2_DEG);
+            printf("Range for J2: ±%.2lf deg\n",MAX_ABS_THETA2_DEG);
             continue;
          break;
       }
@@ -210,63 +206,77 @@ void moveScaraFK(void) {
  */
 void moveScaraIK(void) {
    char pose;
-   double J1, J2, X, Y;
-   int error;
-   int RL = 0;
-   //Prompt for angles
+   double J1 = 0, J2 = 0, X = 0, Y = 0;
+   double J1_left = 0, J2_left = 0, J1_right = 0, J2_right = 0;
+   int error_left = 0, error_right = 0;
+   
+   //Prompt for coordinates
    do {
-      error = 0;
       printf("\n\nInput a set of coordinates (X, Y):\n");
       scanf("%lf, %lf", &X, &Y);
       getchar();
 
-      error = scaraIK(X,Y,&J1,&J2, ArmType);
-      if (error) {
-         error = scaraIK(X,Y,&J1,&J2, -ArmType);
-         /*RL = 1;
-         if (!scaraIK(X,Y,&J1,&J2, -ArmType)) {
-            ArmType = -ArmType;
-            RL = 2;
-            error = -1;
-         }*/
+      // Try both arm configurations
+      error_left = scaraIK(X, Y, &J1_left, &J2_left, LEFT_ARM_SOLUTION);
+      error_right = scaraIK(X, Y, &J1_right, &J2_right, RIGHT_ARM_SOLUTION);
+
+      // Check if either configuration is valid
+      if (error_left && error_right) {
+         printf("Coordinates (%.2lf, %.2lf) are out of reach for both arm configurations!\n", X, Y);
+         printf("Max range: %.2lf mm\nMin range: %.2lf mm\n", L1+L2, L1-L2);
+         continue;
       }
 
-      switch (error) {
-         case (-1):
-            printf("coordinates exceed maximum range!\n");
-            printf("Max range: %.2lf mm\nMin range: %.2lf mm",L1+L2,L1-L2);
-         continue;
-         break;
-         case (-2):
-            printf("coordinates exceed minimum range!\n");
-            printf("Max range: %.2lf mm\nMin range: %.2lf mm",L1+L2,L1-L2);
-         continue;
-         break;
-      }
-
-      //Prompt for pose type
-      bool _pose;
-      if (RL ==0) {
+      // If both configurations are valid, prompt user to choose
+      if (!error_left && !error_right) {
+         bool valid_choice = false;
          do {
-            _pose = false;
+            printf("Both arm configurations are possible:\n");
+            printf("Left arm (L): J1=%.2lf deg, J2=%.2lf deg\n", J1_left, J2_left);
+            printf("Right arm (R): J1=%.2lf deg, J2=%.2lf deg\n", J1_right, J2_right);
             printf("Select arm pose (L/R): ");
-            scanf_s("%c",&pose,1);
+            scanf_s("%c", &pose, 1);
             getchar();
-            if (pose == 'R' || pose == 'r') {
-               ArmType = RIGHT_ARM_SOLUTION;
-               scaraIK(X,Y,&J1,&J2, ArmType);
-               _pose = true;
-            }
+            
             if (pose == 'L' || pose == 'l') {
+               J1 = J1_left;
+               J2 = J2_left;
                ArmType = LEFT_ARM_SOLUTION;
-               scaraIK(X,Y,&J1,&J2, ArmType);
-               _pose = true;
+               valid_choice = true;
+            } else if (pose == 'R' || pose == 'r') {
+               J1 = J1_right;
+               J2 = J2_right;
+               ArmType = RIGHT_ARM_SOLUTION;
+               valid_choice = true;
+            } else {
+               printf("Invalid choice. Please enter L or R.\n");
             }
-         } while (!_pose);
+         } while (!valid_choice);
+      } else {
+         // Only one configuration is valid
+         if (!error_left) {
+            J1 = J1_left;
+            J2 = J2_left;
+            ArmType = LEFT_ARM_SOLUTION;
+            printf("Using left arm configuration (only valid option)\n");
+         } else {
+            J1 = J1_right;
+            J2 = J2_right;
+            ArmType = RIGHT_ARM_SOLUTION;
+            printf("Using right arm configuration (only valid option)\n");
+         }
       }
-   } while (error);
+
+      // Display the selected configuration
+      printf("Selected arm configuration: %s\n", ArmType == LEFT_ARM_SOLUTION ? "LEFT" : "RIGHT");
+      printf("Calculated angles: J1=%.2lf deg, J2=%.2lf deg\n", J1, J2);
+      
+      // Break out of the loop since we have a valid configuration
+      break;
+      
+   } while (1);
+   
    promptPen();
-   printf("Calculated angles: %.2lf,%.2lf\n",J1,J2);
    sprintf(&commandString[0], "ROTATE_JOINT ANG1 %.2lf ANG2 %.2lf\n", J1, J2);
    robot.Send(commandString);
    robot.Send("PEN_UP\n");

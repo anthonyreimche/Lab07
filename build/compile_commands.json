@@ -1,0 +1,14 @@
+[
+{
+  "directory": "C:/Users/roota/CLionProjects/Lab07/build",
+  "command": "C:\\PROGRA~1\\JETBRA~1\\CLION2~1.2\\bin\\mingw\\bin\\G__~1.EXE   -g -std=gnu++14 -o CMakeFiles\\Lab07.dir\\main.cpp.obj -c C:\\Users\\roota\\CLionProjects\\Lab07\\main.cpp",
+  "file": "C:/Users/roota/CLionProjects/Lab07/main.cpp",
+  "output": "CMakeFiles/Lab07.dir/main.cpp.obj"
+},
+{
+  "directory": "C:/Users/roota/CLionProjects/Lab07/build",
+  "command": "C:\\PROGRA~1\\JETBRA~1\\CLION2~1.2\\bin\\mingw\\bin\\G__~1.EXE   -g -std=gnu++14 -o CMakeFiles\\Lab07.dir\\robot.cpp.obj -c C:\\Users\\roota\\CLionProjects\\Lab07\\robot.cpp",
+  "file": "C:/Users/roota/CLionProjects/Lab07/robot.cpp",
+  "output": "CMakeFiles/Lab07.dir/robot.cpp.obj"
+}
+]
